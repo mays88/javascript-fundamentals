@@ -78,6 +78,27 @@ const LearnerSubmissions = [
 
 function getLearnerData(course, ag, submissions) {
     // here, we would process this data to achieve the desired result.
+
+    // console.log(course);
+    // console.log(ag);
+    // console.log(submissions);
+
+    //   // Validate input data
+    //   if (!isValidCourse(courseInfo) || !isValidAssignmentGroup(assignmentGroup) || !isValidLearnerSubmissions(learnerSubmissions)) {
+    //     throw new Error("Invalid input data.");
+    // }
+
+    // Check if AssignmentGroup belongs to Course
+    assignmentGroupInCourse(course, ag);
+
+    // const result = Object.values(learnerData).map(learner => {
+    //     const avg = learner.totalPoints !== 0 ? (learner.weightedPoints / learner.totalPoints) * 100 : 0;
+    //     return {
+    //         id: learner.id,
+    //         avg: avg,
+    //         ...learner.assignmentScores
+    //     };
+    // });
     const result = [
         {
             id: 125,
@@ -99,3 +120,9 @@ function getLearnerData(course, ag, submissions) {
 const result = getLearnerData(CourseInfo, AssignmentGroup, LearnerSubmissions);
 
 console.log(result);
+
+function assignmentGroupInCourse(course, ag) {
+    if (course.id !== ag.course_id) {
+        throw new Error("Assignment Group does not belong to Course.");
+    }
+}
