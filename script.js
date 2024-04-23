@@ -78,51 +78,154 @@ const LearnerSubmissions = [
 
 function getLearnerData(course, ag, submissions) {
     // here, we would process this data to achieve the desired result.
+    // console.log(ag.assignments[0].points_possible);
+    try {
+        if (
+            !isValidCourse(course) ||
+            !isValidAssignmentGroup(ag) ||
+            !isValidLearnerSubmissions(submissions)
+        ) {
+            throw new Error("Invalid input data.");
+        }
 
-    // console.log(course);
-    // console.log(ag);
-    // console.log(submissions);
+        if (!isAssignmentGroupInCourse(course, ag)) {
+            throw new Error("Assignment Group does not belong to Course.");
+        }
 
-    //   // Validate input data
-    //   if (!isValidCourse(courseInfo) || !isValidAssignmentGroup(assignmentGroup) || !isValidLearnerSubmissions(learnerSubmissions)) {
-    //     throw new Error("Invalid input data.");
-    // }
+        const learnerData = {};
 
-    // Check if AssignmentGroup belongs to Course
-    assignmentGroupInCourse(course, ag);
+        // Initialize learnerData object
+        submissions.forEach((submission) => {
+            if (!learnerData[submission.learner_id]) {
+                learnerData[submission.learner_id] = {
+                    id: submission.learner_id,
+                    totalPoints: 0,
+                    weightedPoints: 0,
+                    assignmentScores: {},
+                };
+            }
+        });
 
-    // const result = Object.values(learnerData).map(learner => {
-    //     const avg = learner.totalPoints !== 0 ? (learner.weightedPoints / learner.totalPoints) * 100 : 0;
-    //     return {
-    //         id: learner.id,
-    //         avg: avg,
-    //         ...learner.assignmentScores
-    //     };
-    // });
-    const result = [
-        {
-            id: 125,
-            avg: 0.985, // (47 + 150) / (50 + 150)
-            1: 0.94, // 47 / 50
-            2: 1.0, // 150 / 150
-        },
-        {
-            id: 132,
-            avg: 0.82, // (39 + 125) / (50 + 150)
-            1: 0.78, // 39 / 50
-            2: 0.833, // late: (140 - 15) / 150
-        },
-    ];
+        ag.assignments.forEach((assignment) => {
+            submissions.forEach((submission) => {
+                if (submission.assignment_id === assignment.id) {
+                    const learner = learnerData[submission.learner_id];
+                    const assignmentDueDate = new Date(assignment.due_at);
+                    const submissionDate = new Date(
+                        submission.submission.submitted_at
+                    );
+                    const lateSubmissionPenalty =
+                        submissionDate > assignmentDueDate ? 0.9 : 1;
 
-    return result;
+                    // Exclude assignments that are not yet due
+                    if (submissionDate <= assignmentDueDate) {
+                        const score =
+                            submission.submission.score * lateSubmissionPenalty;
+                        const maxPoints = assignment.points_possible;
+
+                        learner.totalPoints += maxPoints;
+                        learner.weightedPoints += score;
+
+                        if (maxPoints !== 0) {
+                            // Avoid division by zero
+                            const percentageScore = (score / maxPoints) * 100;
+                            learner.assignmentScores[assignment.id] =
+                                percentageScore;
+                        }
+                    }
+                }
+            });
+        });
+
+        const result = Object.values(learnerData).map((learner) => {
+            const avg =
+                learner.totalPoints !== 0
+                    ? (learner.weightedPoints / learner.totalPoints) * 100
+                    : 0;
+            return {
+                id: learner.id,
+                avg: avg,
+                ...learner.assignmentScores,
+            };
+        });
+
+        return result;
+    } catch (error) {
+        console.log(error);
+    }
 }
 
 const result = getLearnerData(CourseInfo, AssignmentGroup, LearnerSubmissions);
 
 console.log(result);
 
-function assignmentGroupInCourse(course, ag) {
-    if (course.id !== ag.course_id) {
-        throw new Error("Assignment Group does not belong to Course.");
+function isAssignmentGroupInCourse(course, ag) {
+    return course.id === ag.course_id;
+}
+
+function isValidCourse(course) {
+    return (
+        course &&
+        typeof course === "object" &&
+        course.hasOwnProperty("id") &&
+        typeof course.id === "number" &&
+        course.hasOwnProperty("name") &&
+        typeof course.name === "string"
+    );
+}
+
+function isValidAssignmentGroup(ag) {
+    if (!ag || typeof ag !== "object") return false;
+    if (!ag.hasOwnProperty("id") || typeof ag.id !== "number") return false;
+    if (!ag.hasOwnProperty("name") || typeof ag.name !== "string") return false;
+    if (!ag.hasOwnProperty("course_id") || typeof ag.course_id !== "number")
+        return false;
+    if (
+        !ag.hasOwnProperty("group_weight") ||
+        typeof ag.group_weight !== "number"
+    )
+        return false;
+    if (!ag.hasOwnProperty("assignments") || !Array.isArray(ag.assignments))
+        return false;
+
+    if (!pointsPossible(ag)) return false;
+    return true;
+}
+
+function pointsPossible(ag) {
+    let result = true;
+    for (i = 0; i < ag.assignments.length; i++) {
+        if (ag.assignments[i].points_possible <= 0) {
+            result = false;
+        }
     }
+    return result;
+}
+function isValidLearnerSubmissions(submissions) {
+    if (!Array.isArray(submissions)) return false;
+    for (const submission of submissions) {
+        if (typeof submission !== "object") return false;
+        if (
+            !submission.hasOwnProperty("learner_id") ||
+            typeof submission.learner_id !== "number"
+        )
+            return false;
+        if (
+            !submission.hasOwnProperty("assignment_id") ||
+            typeof submission.assignment_id !== "number"
+        )
+            return false;
+        if (
+            !submission.hasOwnProperty("submission") ||
+            typeof submission.submission !== "object"
+        )
+            return false;
+        const {
+            submission: { submitted_at, score },
+        } = submission;
+        if (typeof submitted_at !== "string" || isNaN(new Date(submitted_at)))
+            return false;
+        if (typeof score !== "number") return false;
+    }
+    return true;
 }
